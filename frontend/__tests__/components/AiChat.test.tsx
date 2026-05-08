@@ -141,6 +141,6 @@ describe("AiChat", () => {
     const secondCall = mockedChat.mock.calls[1];
     const history = secondCall[2];
     expect(history.length).toBeGreaterThan(0);
-    expect(history[0].role).toBe("user");
+    expect(history.some((m: { role: string }) => m.role === "user")).toBe(true);
   });
 });

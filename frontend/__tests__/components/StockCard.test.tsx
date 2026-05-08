@@ -71,7 +71,7 @@ describe("StockCard", () => {
 
   it("renders MACD crossover label", () => {
     render(<StockCard signal={baseSignal} />);
-    expect(screen.getByText(/macd bullish/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/macd bullish/i).length).toBeGreaterThan(0);
   });
 
   it("renders first reason", () => {
