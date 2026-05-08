@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, develop, "feature/**"]
+    branches: ["**"]
   pull_request:
     branches: [main, develop]
 
@@ -13,7 +13,7 @@ env:
 
 jobs:
   # ──────────────────────────────────────────────
-  # Java services (matrix build)
+  # Java — unit + integration tests (matrix)
   # ──────────────────────────────────────────────
   java-tests:
     name: Java — ${{ matrix.service }}
@@ -30,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # needed for SonarCloud blame data
+          fetch-depth: 0
 
       - name: Set up JDK ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
@@ -39,7 +39,7 @@ jobs:
           distribution: temurin
           cache: maven
 
-      - name: Build & test ${{ matrix.service }}
+      - name: Run unit + integration tests
         working-directory: backend/${{ matrix.service }}
         run: mvn -B verify --no-transfer-progress
 
@@ -51,7 +51,7 @@ jobs:
           retention-days: 7
 
   # ──────────────────────────────────────────────
-  # Python — AI Orchestrator
+  # Python — AI Orchestrator unit tests
   # ──────────────────────────────────────────────
   python-orchestrator:
     name: Python — AI Orchestrator
@@ -60,8 +60,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -69,26 +68,23 @@ jobs:
 
       - name: Install dependencies
         working-directory: ai-orchestrator
-        run: pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx
+        run: pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx -q
 
-      - name: Run tests with coverage
+      - name: Run tests
         working-directory: ai-orchestrator
         run: |
           pytest tests/ -v \
-            --cov=. \
-            --cov-report=xml:coverage.xml \
-            --cov-report=term-missing \
-            --cov-omit="tests/*"
+            --cov=. --cov-report=xml:coverage.xml \
+            --cov-report=term-missing --cov-omit="tests/*"
 
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: coverage-ai-orchestrator
           path: ai-orchestrator/coverage.xml
           retention-days: 7
 
   # ──────────────────────────────────────────────
-  # Python — MCP Servers
+  # Python — MCP server unit tests (matrix)
   # ──────────────────────────────────────────────
   python-mcp-servers:
     name: Python — MCP ${{ matrix.server }}
@@ -103,8 +99,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -112,26 +107,114 @@ jobs:
 
       - name: Install dependencies
         working-directory: mcp-servers/${{ matrix.server }}
-        run: pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx
+        run: pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx -q
 
-      - name: Run tests with coverage
+      - name: Run tests
         working-directory: mcp-servers/${{ matrix.server }}
         run: |
           pytest tests/ -v \
-            --cov=. \
-            --cov-report=xml:coverage.xml \
-            --cov-report=term-missing \
-            --cov-omit="tests/*"
+            --cov=. --cov-report=xml:coverage.xml \
+            --cov-report=term-missing --cov-omit="tests/*"
 
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.server }}
           path: mcp-servers/${{ matrix.server }}/coverage.xml
           retention-days: 7
 
   # ──────────────────────────────────────────────
-  # Frontend — build & type-check
+  # Python — Integration tests
+  # ──────────────────────────────────────────────
+  python-integration:
+    name: Python — Integration
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install \
+            -r ai-orchestrator/requirements.txt \
+            -r mcp-servers/stock-data-server/requirements.txt \
+            -r mcp-servers/technical-analysis-server/requirements.txt \
+            -r integration-tests/python/requirements.txt -q
+
+      - name: Run integration tests
+        working-directory: integration-tests/python
+        run: |
+          pytest . -v \
+            --cov --cov-report=xml:coverage.xml -q
+
+  # ──────────────────────────────────────────────
+  # Python — X-Ray acceptance tests
+  # ──────────────────────────────────────────────
+  xray-tests:
+    name: X-Ray Acceptance Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install \
+            -r ai-orchestrator/requirements.txt \
+            -r mcp-servers/stock-data-server/requirements.txt \
+            -r mcp-servers/technical-analysis-server/requirements.txt \
+            -r xray-tests/requirements.txt -q
+
+      - name: Run X-Ray tests
+        working-directory: xray-tests
+        run: pytest . -v
+
+  # ──────────────────────────────────────────────
+  # Performance — pytest-benchmark
+  # ──────────────────────────────────────────────
+  performance-benchmarks:
+    name: Performance — Benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install \
+            -r mcp-servers/technical-analysis-server/requirements.txt \
+            -r ai-orchestrator/requirements.txt \
+            -r performance-tests/benchmark/requirements.txt -q
+
+      - name: Run benchmarks
+        working-directory: performance-tests/benchmark
+        run: |
+          pytest test_benchmarks.py -v \
+            --benchmark-json=benchmark-results.json \
+            --benchmark-sort=mean
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: performance-tests/benchmark/benchmark-results.json
+          retention-days: 30
+
+  # ──────────────────────────────────────────────
+  # Frontend — build + type-check
   # ──────────────────────────────────────────────
   frontend-build:
     name: Frontend — build
@@ -140,8 +223,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -169,8 +251,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -180,12 +261,11 @@ jobs:
         working-directory: frontend
         run: npm ci
 
-      - name: Run Jest tests with coverage
+      - name: Run Jest with coverage
         working-directory: frontend
         run: npm run test:coverage -- --ci
 
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: coverage-frontend-jest
           path: frontend/coverage/
@@ -202,8 +282,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -217,14 +296,22 @@ jobs:
         working-directory: frontend
         run: npx playwright install --with-deps chromium
 
-      - name: Build for E2E
+      - name: Build Next.js
         working-directory: frontend
         run: npm run build
 
-      - name: Run Playwright tests
+      - name: Start server and run E2E tests
         working-directory: frontend
-        run: PLAYWRIGHT_BASE_URL=http://localhost:3000 npx next start &
-             sleep 5 && npm run test:e2e -- --project=chromium
+        run: |
+          npx next start &
+          SERVER_PID=$!
+          echo "Waiting for server on :3000..."
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000 > /dev/null 2>&1 && break
+            sleep 2
+          done
+          npm run test:e2e -- --project=chromium
+          kill $SERVER_PID
 
       - name: Upload Playwright report
         if: always()
@@ -235,95 +322,7 @@ jobs:
           retention-days: 7
 
   # ──────────────────────────────────────────────
-  # Python integration tests
-  # ──────────────────────────────────────────────
-  python-integration:
-    name: Python — Integration
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          pip install -r ai-orchestrator/requirements.txt \
-                      -r mcp-servers/stock-data-server/requirements.txt \
-                      -r mcp-servers/technical-analysis-server/requirements.txt \
-                      -r integration-tests/python/requirements.txt -q
-
-      - name: Run integration tests
-        working-directory: integration-tests/python
-        run: pytest . -v --cov --cov-report=xml:coverage.xml -q
-
-  # ──────────────────────────────────────────────
-  # X-Ray acceptance tests
-  # ──────────────────────────────────────────────
-  xray-tests:
-    name: X-Ray Acceptance Tests
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          pip install -r ai-orchestrator/requirements.txt \
-                      -r mcp-servers/stock-data-server/requirements.txt \
-                      -r mcp-servers/technical-analysis-server/requirements.txt \
-                      -r xray-tests/requirements.txt -q
-
-      - name: Run X-Ray acceptance tests
-        working-directory: xray-tests
-        run: pytest . -v -q
-
-  # ──────────────────────────────────────────────
-  # Performance benchmarks
-  # ──────────────────────────────────────────────
-  performance-benchmarks:
-    name: Performance — Benchmarks
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: Install dependencies
-        run: |
-          pip install -r mcp-servers/technical-analysis-server/requirements.txt \
-                      -r ai-orchestrator/requirements.txt \
-                      -r performance-tests/benchmark/requirements.txt -q
-
-      - name: Run benchmarks
-        working-directory: performance-tests/benchmark
-        run: |
-          pytest test_benchmarks.py \
-            --benchmark-json=benchmark-results.json \
-            --benchmark-sort=mean \
-            -v
-
-      - name: Upload benchmark results
-        uses: actions/upload-artifact@v4
-        with:
-          name: benchmark-results
-          path: performance-tests/benchmark/benchmark-results.json
-          retention-days: 30
-
-  # ──────────────────────────────────────────────
-  # SonarQube analysis — self-hosted community
+  # SonarQube — runs after ALL tests pass
   # ──────────────────────────────────────────────
   sonarqube:
     name: SonarQube
@@ -334,8 +333,10 @@ jobs:
       - python-mcp-servers
       - python-integration
       - xray-tests
+      - performance-benchmarks
       - frontend-build
       - frontend-unit-tests
+      - frontend-e2e
 
     services:
       sonarqube:
@@ -354,15 +355,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up JDK ${{ env.JAVA_VERSION }}
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: ${{ env.JAVA_VERSION }}
           distribution: temurin
           cache: maven
 
-      - name: Set up Python ${{ env.PYTHON_VERSION }}
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -404,3 +403,34 @@ jobs:
             -Dsonar.token=admin \
             -Dsonar.projectKey=stock-intelligence-platform \
             -Dsonar.projectName="Stock Intelligence Platform"
+
+  # ──────────────────────────────────────────────
+  # Final gate — single required status check
+  # ──────────────────────────────────────────────
+  ci-success:
+    name: CI Passed
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - java-tests
+      - python-orchestrator
+      - python-mcp-servers
+      - python-integration
+      - xray-tests
+      - performance-benchmarks
+      - frontend-build
+      - frontend-unit-tests
+      - frontend-e2e
+      - sonarqube
+
+    steps:
+      - name: Check all jobs passed
+        run: |
+          results="${{ join(needs.*.result, ' ') }}"
+          for result in $results; do
+            if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
+              echo "Job failed with result: $result"
+              exit 1
+            fi
+          done
+          echo "All jobs passed."
