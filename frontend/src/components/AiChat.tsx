@@ -158,6 +158,7 @@ export default function AiChat({ userId }: { userId: string }) {
           className="flex-1 border border-gray-300 text-gray-800 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#166534] transition-colors placeholder-gray-400 bg-white"
         />
         <button
+          aria-label="Send"
           onClick={() => send()}
           disabled={loading || !input.trim()}
           className="w-9 h-9 rounded-lg bg-[#166534] hover:bg-[#15803d] disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors"

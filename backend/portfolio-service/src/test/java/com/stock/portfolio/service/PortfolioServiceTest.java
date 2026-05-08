@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -144,7 +145,7 @@ class PortfolioServiceTest {
         when(portfolioRepository.findById(any(UUID.class))).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> portfolioService.rebalancePortfolio(portfolioId.toString()))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("Portfolio not found");
     }
 
