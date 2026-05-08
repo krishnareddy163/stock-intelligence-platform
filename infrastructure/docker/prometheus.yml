@@ -1,0 +1,60 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files: []
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "ai-orchestrator"
+    static_configs:
+      - targets: ["ai-orchestrator:5000"]
+    metrics_path: "/metrics"
+
+  - job_name: "stock-data-mcp"
+    static_configs:
+      - targets: ["stock-data-server:5001"]
+    metrics_path: "/metrics"
+
+  - job_name: "sentiment-mcp"
+    static_configs:
+      - targets: ["sentiment-server:5002"]
+    metrics_path: "/metrics"
+
+  - job_name: "prediction-mcp"
+    static_configs:
+      - targets: ["prediction-server:5003"]
+    metrics_path: "/metrics"
+
+  - job_name: "portfolio-mcp"
+    static_configs:
+      - targets: ["portfolio-server:5004"]
+    metrics_path: "/metrics"
+
+  - job_name: "api-gateway"
+    static_configs:
+      - targets: ["api-gateway:8080"]
+    metrics_path: "/actuator/prometheus"
+
+  - job_name: "user-service"
+    static_configs:
+      - targets: ["user-service:8081"]
+    metrics_path: "/actuator/prometheus"
+
+  - job_name: "recommendation-service"
+    static_configs:
+      - targets: ["recommendation-service:8082"]
+    metrics_path: "/actuator/prometheus"
+
+  - job_name: "portfolio-service"
+    static_configs:
+      - targets: ["portfolio-service:8083"]
+    metrics_path: "/actuator/prometheus"

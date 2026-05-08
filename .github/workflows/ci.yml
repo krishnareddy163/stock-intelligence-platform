@@ -1,0 +1,219 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop, "feature/**"]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  JAVA_VERSION: "17"
+  PYTHON_VERSION: "3.11"
+  NODE_VERSION: "20"
+
+jobs:
+  # ──────────────────────────────────────────────
+  # Java services (matrix build)
+  # ──────────────────────────────────────────────
+  java-tests:
+    name: Java — ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - user-service
+          - portfolio-service
+          - recommendation-service
+          - api-gateway
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # needed for SonarCloud blame data
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Build & test ${{ matrix.service }}
+        working-directory: backend/${{ matrix.service }}
+        run: mvn -B verify --no-transfer-progress
+
+      - name: Upload JaCoCo report
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-${{ matrix.service }}
+          path: backend/${{ matrix.service }}/target/site/jacoco/
+          retention-days: 7
+
+  # ──────────────────────────────────────────────
+  # Python — AI Orchestrator
+  # ──────────────────────────────────────────────
+  python-orchestrator:
+    name: Python — AI Orchestrator
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: ai-orchestrator/requirements.txt
+
+      - name: Install dependencies
+        working-directory: ai-orchestrator
+        run: pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx
+
+      - name: Run tests with coverage
+        working-directory: ai-orchestrator
+        run: |
+          pytest tests/ -v \
+            --cov=. \
+            --cov-report=xml:coverage.xml \
+            --cov-report=term-missing \
+            --cov-omit="tests/*"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-ai-orchestrator
+          path: ai-orchestrator/coverage.xml
+          retention-days: 7
+
+  # ──────────────────────────────────────────────
+  # Python — MCP Servers
+  # ──────────────────────────────────────────────
+  python-mcp-servers:
+    name: Python — MCP ${{ matrix.server }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        server:
+          - stock-data-server
+          - technical-analysis-server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: mcp-servers/${{ matrix.server }}/requirements.txt
+
+      - name: Install dependencies
+        working-directory: mcp-servers/${{ matrix.server }}
+        run: pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx
+
+      - name: Run tests with coverage
+        working-directory: mcp-servers/${{ matrix.server }}
+        run: |
+          pytest tests/ -v \
+            --cov=. \
+            --cov-report=xml:coverage.xml \
+            --cov-report=term-missing \
+            --cov-omit="tests/*"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.server }}
+          path: mcp-servers/${{ matrix.server }}/coverage.xml
+          retention-days: 7
+
+  # ──────────────────────────────────────────────
+  # Frontend — build & type-check
+  # ──────────────────────────────────────────────
+  frontend-build:
+    name: Frontend — build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Type check
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  # ──────────────────────────────────────────────
+  # SonarCloud analysis (runs after all tests pass)
+  # ──────────────────────────────────────────────
+  sonarcloud:
+    name: SonarCloud
+    runs-on: ubuntu-latest
+    needs:
+      - java-tests
+      - python-orchestrator
+      - python-mcp-servers
+      - frontend-build
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+          cache: maven
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # Rebuild Java classes so sonar can read binaries
+      - name: Compile Java services
+        run: |
+          for svc in user-service portfolio-service recommendation-service api-gateway; do
+            cd backend/$svc && mvn -B compile --no-transfer-progress -q && cd ../..
+          done
+
+      # Download all coverage artifacts
+      - name: Download Java JaCoCo reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: jacoco-*
+          merge-multiple: true
+
+      - name: Download Python coverage reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=${{ secrets.SONAR_ORG }}
+            -Dsonar.projectKey=stock-intelligence-platform

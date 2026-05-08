@@ -1,0 +1,53 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: recommendation-service
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/stock_db}
+    username: ${DATABASE_USER:stock_user}
+    password: ${DATABASE_PASSWORD:stock_pass}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
+  data:
+    redis:
+      host: ${SPRING_REDIS_HOST:redis}
+      port: ${SPRING_REDIS_PORT:6379}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+mcp:
+  orchestrator:
+    url: ${MCP_ORCHESTRATOR_URL:http://ai-orchestrator:5000}
+  stock-data:
+    url: ${MCP_STOCK_DATA_URL:http://stock-data-server:5001}
+  technical:
+    url: ${MCP_TECHNICAL_URL:http://technical-analysis-server:5005}
+  alert:
+    url: ${MCP_ALERT_URL:http://alert-server:5006}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    com.stock: INFO
+    org.springframework.web: WARN

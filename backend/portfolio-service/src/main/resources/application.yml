@@ -1,0 +1,28 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: portfolio-service
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/stock_db}
+    username: ${DATABASE_USER:stock_user}
+    password: ${DATABASE_PASSWORD:stock_pass}
+    hikari:
+      maximum-pool-size: 20
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://localhost:27017/stock_db}
+    redis:
+      host: ${SPRING_REDIS_HOST:redis}
+      port: ${SPRING_REDIS_PORT:6379}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus,metrics

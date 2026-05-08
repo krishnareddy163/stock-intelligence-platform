@@ -1,0 +1,451 @@
+version: '3.9'
+
+services:
+  # ============================================================
+  # DATABASES
+  # ============================================================
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres_stock_db
+    environment:
+      POSTGRES_DB: stock_db
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/docker/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stock_network
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: timescaledb_tseries
+    environment:
+      POSTGRES_DB: timeseries_db
+      POSTGRES_USER: ${TS_DB_USER}
+      POSTGRES_PASSWORD: ${TS_DB_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TS_DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stock_network
+
+  mongodb:
+    image: mongo:6
+    container_name: mongodb_nosql
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stock_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis_cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stock_network
+
+  # ============================================================
+  # MESSAGE BROKER
+  # ============================================================
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - stock_network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka_broker
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "29092:29092"
+    networks:
+      - stock_network
+
+  # ============================================================
+  # MCP SERVERS
+  # ============================================================
+
+  stock-data-server:
+    build:
+      context: ./mcp-servers/stock-data-server
+    container_name: stock_data_mcp
+    ports:
+      - "5001:5001"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5001/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stock_network
+
+  sentiment-server:
+    build:
+      context: ./mcp-servers/sentiment-server
+    container_name: sentiment_mcp
+    ports:
+      - "5002:5002"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      NEWSAPI_KEY: ${NEWSAPI_KEY:-}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5002/health')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - stock_network
+
+  prediction-server:
+    build:
+      context: ./mcp-servers/prediction-server
+    container_name: prediction_mcp
+    ports:
+      - "5003:5003"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      TIMESCALEDB_URL: postgresql://${TS_DB_USER}:${TS_DB_PASSWORD}@timescaledb:5432/timeseries_db
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5003/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stock_network
+
+  portfolio-server:
+    build:
+      context: ./mcp-servers/portfolio-server
+    container_name: portfolio_mcp
+    ports:
+      - "5004:5004"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5004/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stock_network
+
+  technical-analysis-server:
+    build:
+      context: ./mcp-servers/technical-analysis-server
+    container_name: technical_analysis_mcp
+    ports:
+      - "5005:5005"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5005/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stock_network
+
+  alert-server:
+    build:
+      context: ./mcp-servers/alert-server
+    container_name: alert_mcp
+    ports:
+      - "5006:5006"
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5006/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stock_network
+
+  # ============================================================
+  # AI ORCHESTRATOR (Claude API + MCP Client)
+  # ============================================================
+
+  ai-orchestrator:
+    build:
+      context: ./ai-orchestrator
+    container_name: ai_orchestrator
+    ports:
+      - "5000:5000"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      MCP_STOCK_DATA_URL: http://stock-data-server:5001
+      MCP_SENTIMENT_URL: http://sentiment-server:5002
+      MCP_PREDICTION_URL: http://prediction-server:5003
+      MCP_PORTFOLIO_URL: http://portfolio-server:5004
+      MCP_TECHNICAL_URL: http://technical-analysis-server:5005
+      MCP_ALERT_URL: http://alert-server:5006
+    depends_on:
+      stock-data-server:
+        condition: service_healthy
+      sentiment-server:
+        condition: service_healthy
+      prediction-server:
+        condition: service_healthy
+      portfolio-server:
+        condition: service_healthy
+      technical-analysis-server:
+        condition: service_healthy
+      alert-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5000/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stock_network
+
+  # ============================================================
+  # BACKEND SERVICES (Spring Boot)
+  # ============================================================
+
+  api-gateway:
+    build:
+      context: ./backend/api-gateway
+    container_name: api_gateway_service
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stock_network
+
+  user-service:
+    build:
+      context: ./backend/user-service
+    container_name: user_service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DATABASE_URL: jdbc:postgresql://postgres:5432/stock_db
+      DATABASE_USER: ${DB_USER}
+      DATABASE_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stock_network
+
+  recommendation-service:
+    build:
+      context: ./backend/recommendation-service
+    container_name: recommendation_service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DATABASE_URL: jdbc:postgresql://postgres:5432/stock_db
+      DATABASE_USER: ${DB_USER}
+      DATABASE_PASSWORD: ${DB_PASSWORD}
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      MCP_ORCHESTRATOR_URL: http://ai-orchestrator:5000
+      MCP_STOCK_DATA_URL: http://stock-data-server:5001
+      MCP_TECHNICAL_URL: http://technical-analysis-server:5005
+      MCP_ALERT_URL: http://alert-server:5006
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ai-orchestrator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/api/v1/recommendations/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stock_network
+
+  portfolio-service:
+    build:
+      context: ./backend/portfolio-service
+    container_name: portfolio_service
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      DATABASE_URL: jdbc:postgresql://postgres:5432/stock_db
+      DATABASE_USER: ${DB_USER}
+      DATABASE_PASSWORD: ${DB_PASSWORD}
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/stock_db?authSource=admin
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      MCP_PORTFOLIO_URL: http://portfolio-server:5004
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/api/v1/portfolios/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - stock_network
+
+  # ============================================================
+  # FRONTEND
+  # ============================================================
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: react_dashboard
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      NEXT_PUBLIC_ORCHESTRATOR_URL: http://localhost:5000
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - stock_network
+
+  # ============================================================
+  # MONITORING
+  # ============================================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus_monitoring
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/docker/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+    networks:
+      - stock_network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana_dashboard
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/stock-platform.json
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - stock_network
+
+volumes:
+  postgres_data:
+  redis_data:
+  timescaledb_data:
+  mongodb_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  stock_network:
+    driver: bridge
