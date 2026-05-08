@@ -160,6 +160,169 @@ jobs:
         run: npm run build
 
   # ──────────────────────────────────────────────
+  # Frontend — Jest unit tests
+  # ──────────────────────────────────────────────
+  frontend-unit-tests:
+    name: Frontend — Jest
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run Jest tests with coverage
+        working-directory: frontend
+        run: npm run test:coverage -- --ci
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-frontend-jest
+          path: frontend/coverage/
+          retention-days: 7
+
+  # ──────────────────────────────────────────────
+  # Frontend — Playwright E2E
+  # ──────────────────────────────────────────────
+  frontend-e2e:
+    name: Frontend — Playwright E2E
+    runs-on: ubuntu-latest
+    needs: frontend-build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Build for E2E
+        working-directory: frontend
+        run: npm run build
+
+      - name: Run Playwright tests
+        working-directory: frontend
+        run: PLAYWRIGHT_BASE_URL=http://localhost:3000 npx next start &
+             sleep 5 && npm run test:e2e -- --project=chromium
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7
+
+  # ──────────────────────────────────────────────
+  # Python integration tests
+  # ──────────────────────────────────────────────
+  python-integration:
+    name: Python — Integration
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r ai-orchestrator/requirements.txt \
+                      -r mcp-servers/stock-data-server/requirements.txt \
+                      -r mcp-servers/technical-analysis-server/requirements.txt \
+                      -r integration-tests/python/requirements.txt -q
+
+      - name: Run integration tests
+        working-directory: integration-tests/python
+        run: pytest . -v --cov --cov-report=xml:coverage.xml -q
+
+  # ──────────────────────────────────────────────
+  # X-Ray acceptance tests
+  # ──────────────────────────────────────────────
+  xray-tests:
+    name: X-Ray Acceptance Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r ai-orchestrator/requirements.txt \
+                      -r mcp-servers/stock-data-server/requirements.txt \
+                      -r mcp-servers/technical-analysis-server/requirements.txt \
+                      -r xray-tests/requirements.txt -q
+
+      - name: Run X-Ray acceptance tests
+        working-directory: xray-tests
+        run: pytest . -v -q
+
+  # ──────────────────────────────────────────────
+  # Performance benchmarks
+  # ──────────────────────────────────────────────
+  performance-benchmarks:
+    name: Performance — Benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          pip install -r mcp-servers/technical-analysis-server/requirements.txt \
+                      -r ai-orchestrator/requirements.txt \
+                      -r performance-tests/benchmark/requirements.txt -q
+
+      - name: Run benchmarks
+        working-directory: performance-tests/benchmark
+        run: |
+          pytest test_benchmarks.py \
+            --benchmark-json=benchmark-results.json \
+            --benchmark-sort=mean \
+            -v
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: performance-tests/benchmark/benchmark-results.json
+          retention-days: 30
+
+  # ──────────────────────────────────────────────
   # SonarQube analysis — self-hosted community
   # ──────────────────────────────────────────────
   sonarqube:
@@ -169,7 +332,10 @@ jobs:
       - java-tests
       - python-orchestrator
       - python-mcp-servers
+      - python-integration
+      - xray-tests
       - frontend-build
+      - frontend-unit-tests
 
     services:
       sonarqube:
