@@ -60,7 +60,7 @@ def redis_mock():
 def stock_client(redis_mock):
     ticker = MagicMock()
     ticker.history.return_value = _two_day_df()
-    with patch("main.redis_client", redis_mock), \
+    with patch("main.aioredis.Redis", return_value=redis_mock), \
          patch("yfinance.Ticker", return_value=ticker):
         import sys
         sys.path.insert(0, "../mcp-servers/stock-data-server")
@@ -99,7 +99,7 @@ def test_unknown_symbol_returns_404(redis_mock):
     """AC: Requesting a non-existent symbol returns HTTP 404."""
     ticker = MagicMock()
     ticker.history.return_value = pd.DataFrame()
-    with patch("main.redis_client", redis_mock), \
+    with patch("main.aioredis.Redis", return_value=redis_mock), \
          patch("yfinance.Ticker", return_value=ticker):
         import sys
         sys.path.insert(0, "../mcp-servers/stock-data-server")
@@ -116,7 +116,7 @@ def test_historical_data_returns_ohlcv_array(redis_mock):
     sys.path.insert(0, "../mcp-servers/stock-data-server")
     ticker = MagicMock()
     ticker.history.return_value = _make_df(n=10, base=2800.0)
-    with patch("main.redis_client", redis_mock), \
+    with patch("main.aioredis.Redis", return_value=redis_mock), \
          patch("yfinance.Ticker", return_value=ticker):
         from main import app
         with TestClient(app) as c:
@@ -136,7 +136,7 @@ def test_nifty50_maps_to_nsei_ticker(redis_mock):
     sys.path.insert(0, "../mcp-servers/stock-data-server")
     ticker = MagicMock()
     ticker.history.return_value = _two_day_df()
-    with patch("main.redis_client", redis_mock), \
+    with patch("main.aioredis.Redis", return_value=redis_mock), \
          patch("yfinance.Ticker", return_value=ticker) as mock_yf:
         from main import app
         with TestClient(app) as c:
@@ -153,7 +153,7 @@ def test_sensex_maps_to_bsesn_ticker(redis_mock):
     sys.path.insert(0, "../mcp-servers/stock-data-server")
     ticker = MagicMock()
     ticker.history.return_value = _two_day_df()
-    with patch("main.redis_client", redis_mock), \
+    with patch("main.aioredis.Redis", return_value=redis_mock), \
          patch("yfinance.Ticker", return_value=ticker) as mock_yf:
         from main import app
         with TestClient(app) as c:
@@ -168,7 +168,7 @@ def test_sensex_maps_to_bsesn_ticker(redis_mock):
 def ta_client(redis_mock):
     ticker = MagicMock()
     ticker.history.return_value = _make_df()
-    with patch("main.redis_client", redis_mock), \
+    with patch("main.aioredis.Redis", return_value=redis_mock), \
          patch("yfinance.Ticker", return_value=ticker):
         import sys
         sys.path.insert(0, "../mcp-servers/technical-analysis-server")
@@ -221,7 +221,7 @@ def test_insufficient_data_returns_404(redis_mock):
     )
     ticker = MagicMock()
     ticker.history.return_value = short_df
-    with patch("main.redis_client", redis_mock), \
+    with patch("main.aioredis.Redis", return_value=redis_mock), \
          patch("yfinance.Ticker", return_value=ticker):
         import importlib
         import main as ta
@@ -246,7 +246,7 @@ def test_oversold_rsi_triggers_buy_signal(redis_mock):
     )
     ticker = MagicMock()
     ticker.history.return_value = bear_df
-    with patch("main.redis_client", redis_mock), \
+    with patch("main.aioredis.Redis", return_value=redis_mock), \
          patch("yfinance.Ticker", return_value=ticker):
         import importlib
         import main as ta
@@ -272,7 +272,7 @@ def test_overbought_rsi_scenario(redis_mock):
     )
     ticker = MagicMock()
     ticker.history.return_value = bull_df
-    with patch("main.redis_client", redis_mock), \
+    with patch("main.aioredis.Redis", return_value=redis_mock), \
          patch("yfinance.Ticker", return_value=ticker):
         import importlib
         import main as ta

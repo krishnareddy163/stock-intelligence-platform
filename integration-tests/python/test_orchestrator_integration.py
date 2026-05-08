@@ -166,6 +166,7 @@ def test_analyze_multiple_tool_calls(orchestrator_client):
 
 def test_chat_simple_message(orchestrator_client):
     client, mock_anthropic, _ = orchestrator_client
+    mock_anthropic.messages.create.side_effect = None
     mock_anthropic.messages.create.return_value = _make_claude_response(
         "TCS is trading at ₹3912. Strong fundamentals, IT sector leader."
     )
@@ -184,6 +185,7 @@ def test_chat_simple_message(orchestrator_client):
 
 def test_chat_preserves_conversation_context(orchestrator_client):
     client, mock_anthropic, _ = orchestrator_client
+    mock_anthropic.messages.create.side_effect = None
     mock_anthropic.messages.create.return_value = _make_claude_response(
         "Based on our previous discussion about TCS, Infosys also looks attractive."
     )

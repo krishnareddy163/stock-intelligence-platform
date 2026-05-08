@@ -50,7 +50,7 @@ def _build_client(mock_redis, df):
 
 def test_health_endpoint(mock_redis):
     yf_mock = _build_client(mock_redis, _rich_df())
-    with patch("main.redis_client", mock_redis), patch("yfinance.Ticker", yf_mock):
+    with patch("main.aioredis.Redis", return_value=mock_redis), patch("yfinance.Ticker", yf_mock):
         from main import app
         with TestClient(app) as c:
             r = c.get("/health")
@@ -60,7 +60,7 @@ def test_health_endpoint(mock_redis):
 
 def test_get_technical_indicators_success(mock_redis):
     yf_mock = _build_client(mock_redis, _rich_df())
-    with patch("main.redis_client", mock_redis), patch("yfinance.Ticker", yf_mock):
+    with patch("main.aioredis.Redis", return_value=mock_redis), patch("yfinance.Ticker", yf_mock):
         from main import app
         with TestClient(app) as c:
             r = c.post("/tools/get_technical_indicators", json={"symbol": "RELIANCE"})
@@ -87,7 +87,7 @@ def test_get_technical_indicators_cache_hit(mock_redis):
     }
     mock_redis.get = AsyncMock(return_value=json.dumps(cached_result))
     yf_mock = _build_client(mock_redis, _rich_df())
-    with patch("main.redis_client", mock_redis), patch("yfinance.Ticker", yf_mock):
+    with patch("main.aioredis.Redis", return_value=mock_redis), patch("yfinance.Ticker", yf_mock):
         from main import app
         with TestClient(app) as c:
             r = c.post("/tools/get_technical_indicators", json={"symbol": "TCS"})
@@ -98,7 +98,7 @@ def test_get_technical_indicators_cache_hit(mock_redis):
 
 def test_get_technical_indicators_insufficient_data(mock_redis):
     yf_mock = _build_client(mock_redis, _short_df())
-    with patch("main.redis_client", mock_redis), patch("yfinance.Ticker", yf_mock):
+    with patch("main.aioredis.Redis", return_value=mock_redis), patch("yfinance.Ticker", yf_mock):
         from main import app
         with TestClient(app) as c:
             r = c.post("/tools/get_technical_indicators", json={"symbol": "SMALL"})
@@ -107,7 +107,7 @@ def test_get_technical_indicators_insufficient_data(mock_redis):
 
 def test_get_technical_indicators_not_found(mock_redis):
     yf_mock = _build_client(mock_redis, _empty_df())
-    with patch("main.redis_client", mock_redis), patch("yfinance.Ticker", yf_mock):
+    with patch("main.aioredis.Redis", return_value=mock_redis), patch("yfinance.Ticker", yf_mock):
         from main import app
         with TestClient(app) as c:
             r = c.post("/tools/get_technical_indicators", json={"symbol": "FAKEXYZ"})
@@ -116,7 +116,7 @@ def test_get_technical_indicators_not_found(mock_redis):
 
 def test_get_rsi_success(mock_redis):
     yf_mock = _build_client(mock_redis, _rich_df())
-    with patch("main.redis_client", mock_redis), patch("yfinance.Ticker", yf_mock):
+    with patch("main.aioredis.Redis", return_value=mock_redis), patch("yfinance.Ticker", yf_mock):
         from main import app
         with TestClient(app) as c:
             r = c.post("/tools/get_rsi", json={"symbol": "WIPRO", "period": 14})
@@ -129,7 +129,7 @@ def test_get_rsi_success(mock_redis):
 
 def test_get_rsi_not_found(mock_redis):
     yf_mock = _build_client(mock_redis, _empty_df())
-    with patch("main.redis_client", mock_redis), patch("yfinance.Ticker", yf_mock):
+    with patch("main.aioredis.Redis", return_value=mock_redis), patch("yfinance.Ticker", yf_mock):
         from main import app
         with TestClient(app) as c:
             r = c.post("/tools/get_rsi", json={"symbol": "FAKE"})
@@ -138,7 +138,7 @@ def test_get_rsi_not_found(mock_redis):
 
 def test_get_macd_success(mock_redis):
     yf_mock = _build_client(mock_redis, _rich_df())
-    with patch("main.redis_client", mock_redis), patch("yfinance.Ticker", yf_mock):
+    with patch("main.aioredis.Redis", return_value=mock_redis), patch("yfinance.Ticker", yf_mock):
         from main import app
         with TestClient(app) as c:
             r = c.post("/tools/get_macd", json={"symbol": "HDFCBANK"})
@@ -152,7 +152,7 @@ def test_get_macd_success(mock_redis):
 
 def test_get_moving_average_success(mock_redis):
     yf_mock = _build_client(mock_redis, _rich_df())
-    with patch("main.redis_client", mock_redis), patch("yfinance.Ticker", yf_mock):
+    with patch("main.aioredis.Redis", return_value=mock_redis), patch("yfinance.Ticker", yf_mock):
         from main import app
         with TestClient(app) as c:
             r = c.post("/tools/get_moving_average", json={"symbol": "INFY"})
@@ -176,7 +176,7 @@ def test_rsi_oversold_signal(mock_redis):
         index=dates,
     )
     yf_mock = _build_client(mock_redis, df)
-    with patch("main.redis_client", mock_redis), patch("yfinance.Ticker", yf_mock):
+    with patch("main.aioredis.Redis", return_value=mock_redis), patch("yfinance.Ticker", yf_mock):
         from main import app
         with TestClient(app) as c:
             r = c.post("/tools/get_rsi", json={"symbol": "BEAR"})

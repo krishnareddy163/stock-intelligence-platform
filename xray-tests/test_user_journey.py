@@ -36,14 +36,15 @@ def orchestrator():
     mock_claude = MagicMock()
     mock_mcp    = AsyncMock()
 
-    import sys
+    import sys, importlib
     sys.path.insert(0, "../ai-orchestrator")
+    import main
+    importlib.reload(main)  # ensure ai-orchestrator's main.py is active
 
     with patch("main.settings", settings), \
          patch("main.claude_client", mock_claude), \
          patch("main.mcp", mock_mcp):
-        from main import app
-        with TestClient(app) as c:
+        with TestClient(main.app) as c:
             yield c, mock_claude, mock_mcp
 
 
@@ -145,6 +146,7 @@ def test_tool_use_cycle_enriches_analysis(orchestrator):
 def test_high_risk_aggressive_strategy_accepted(orchestrator):
     """AC: HIGH risk + MOMENTUM strategy is accepted and processed without error."""
     client, mock_claude, _ = orchestrator
+    mock_claude.messages.create.side_effect = None  # reset exhausted iterator from previous test
     mock_claude.messages.create.return_value = _end_turn(
         "Aggressive portfolio: ADANIENT, ZOMATO, PAYTM for high-risk momentum plays."
     )

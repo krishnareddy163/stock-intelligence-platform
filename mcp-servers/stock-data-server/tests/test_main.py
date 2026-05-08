@@ -60,7 +60,7 @@ def make_client(mock_redis, df):
 def test_health_endpoint(mock_redis, two_day_df):
     ticker_mock = MagicMock()
     ticker_mock.history.return_value = two_day_df
-    with patch("main.redis_client", mock_redis), \
+    with patch("main.aioredis.Redis", return_value=mock_redis), \
          patch("yfinance.Ticker", return_value=ticker_mock):
         from main import app
         with TestClient(app) as c:
@@ -72,7 +72,7 @@ def test_health_endpoint(mock_redis, two_day_df):
 def test_get_stock_price_success(mock_redis, two_day_df):
     ticker_mock = MagicMock()
     ticker_mock.history.return_value = two_day_df
-    with patch("main.redis_client", mock_redis), \
+    with patch("main.aioredis.Redis", return_value=mock_redis), \
          patch("yfinance.Ticker", return_value=ticker_mock):
         from main import app
         with TestClient(app) as c:
@@ -92,7 +92,7 @@ def test_get_stock_price_cache_hit(mock_redis, two_day_df):
     mock_redis.get = AsyncMock(return_value=cached)
     ticker_mock = MagicMock()
     ticker_mock.history.return_value = two_day_df
-    with patch("main.redis_client", mock_redis), \
+    with patch("main.aioredis.Redis", return_value=mock_redis), \
          patch("yfinance.Ticker", return_value=ticker_mock):
         from main import app
         with TestClient(app) as c:
@@ -105,7 +105,7 @@ def test_get_stock_price_cache_hit(mock_redis, two_day_df):
 def test_get_stock_price_not_found(mock_redis, empty_df):
     ticker_mock = MagicMock()
     ticker_mock.history.return_value = empty_df
-    with patch("main.redis_client", mock_redis), \
+    with patch("main.aioredis.Redis", return_value=mock_redis), \
          patch("yfinance.Ticker", return_value=ticker_mock):
         from main import app
         with TestClient(app) as c:
@@ -116,7 +116,7 @@ def test_get_stock_price_not_found(mock_redis, empty_df):
 def test_get_historical_data_success(mock_redis, historical_df):
     ticker_mock = MagicMock()
     ticker_mock.history.return_value = historical_df
-    with patch("main.redis_client", mock_redis), \
+    with patch("main.aioredis.Redis", return_value=mock_redis), \
          patch("yfinance.Ticker", return_value=ticker_mock):
         from main import app
         with TestClient(app) as c:
@@ -133,7 +133,7 @@ def test_get_historical_data_success(mock_redis, historical_df):
 def test_get_historical_data_not_found(mock_redis, empty_df):
     ticker_mock = MagicMock()
     ticker_mock.history.return_value = empty_df
-    with patch("main.redis_client", mock_redis), \
+    with patch("main.aioredis.Redis", return_value=mock_redis), \
          patch("yfinance.Ticker", return_value=ticker_mock):
         from main import app
         with TestClient(app) as c:
@@ -144,7 +144,7 @@ def test_get_historical_data_not_found(mock_redis, empty_df):
 def test_get_market_index_data_nifty50(mock_redis, two_day_df):
     ticker_mock = MagicMock()
     ticker_mock.history.return_value = two_day_df
-    with patch("main.redis_client", mock_redis), \
+    with patch("main.aioredis.Redis", return_value=mock_redis), \
          patch("yfinance.Ticker", return_value=ticker_mock):
         from main import app
         with TestClient(app) as c:
@@ -160,7 +160,7 @@ def test_get_market_index_data_nifty50(mock_redis, two_day_df):
 def test_get_market_index_data_sensex(mock_redis, two_day_df):
     ticker_mock = MagicMock()
     ticker_mock.history.return_value = two_day_df
-    with patch("main.redis_client", mock_redis), \
+    with patch("main.aioredis.Redis", return_value=mock_redis), \
          patch("yfinance.Ticker", return_value=ticker_mock):
         from main import app
         with TestClient(app) as c:
@@ -175,7 +175,7 @@ def test_get_market_index_data_cache_hit(mock_redis, two_day_df):
     mock_redis.get = AsyncMock(return_value=cached)
     ticker_mock = MagicMock()
     ticker_mock.history.return_value = two_day_df
-    with patch("main.redis_client", mock_redis), \
+    with patch("main.aioredis.Redis", return_value=mock_redis), \
          patch("yfinance.Ticker", return_value=ticker_mock):
         from main import app
         with TestClient(app) as c:
@@ -188,7 +188,7 @@ def test_get_market_index_data_cache_hit(mock_redis, two_day_df):
 def test_get_market_index_data_not_found(mock_redis, empty_df):
     ticker_mock = MagicMock()
     ticker_mock.history.return_value = empty_df
-    with patch("main.redis_client", mock_redis), \
+    with patch("main.aioredis.Redis", return_value=mock_redis), \
          patch("yfinance.Ticker", return_value=ticker_mock):
         from main import app
         with TestClient(app) as c:
