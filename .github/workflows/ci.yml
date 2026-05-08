@@ -160,16 +160,28 @@ jobs:
         run: npm run build
 
   # ──────────────────────────────────────────────
-  # SonarCloud analysis (runs after all tests pass)
+  # SonarQube analysis — self-hosted community
   # ──────────────────────────────────────────────
-  sonarcloud:
-    name: SonarCloud
+  sonarqube:
+    name: SonarQube
     runs-on: ubuntu-latest
     needs:
       - java-tests
       - python-orchestrator
       - python-mcp-servers
       - frontend-build
+
+    services:
+      sonarqube:
+        image: sonarqube:community
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -sf http://localhost:9000/api/system/status | grep -q '\"status\":\"UP\"'"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 20
+          --health-start-period 120s
 
     steps:
       - uses: actions/checkout@v4
@@ -188,32 +200,41 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      # Rebuild Java classes so sonar can read binaries
       - name: Compile Java services
         run: |
           for svc in user-service portfolio-service recommendation-service api-gateway; do
-            cd backend/$svc && mvn -B compile --no-transfer-progress -q && cd ../..
+            cd backend/$svc && mvn -B verify --no-transfer-progress -q && cd ../..
           done
 
-      # Download all coverage artifacts
-      - name: Download Java JaCoCo reports
-        uses: actions/download-artifact@v4
-        with:
-          pattern: jacoco-*
-          merge-multiple: true
+      - name: Run Python coverage (orchestrator)
+        working-directory: ai-orchestrator
+        run: |
+          pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx -q
+          pytest tests/ --cov=. --cov-report=xml:coverage.xml --cov-omit="tests/*" -q
 
-      - name: Download Python coverage reports
-        uses: actions/download-artifact@v4
-        with:
-          pattern: coverage-*
-          merge-multiple: true
+      - name: Run Python coverage (stock-data-server)
+        working-directory: mcp-servers/stock-data-server
+        run: |
+          pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx -q
+          pytest tests/ --cov=. --cov-report=xml:coverage.xml --cov-omit="tests/*" -q
 
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          args: >
-            -Dsonar.organization=${{ secrets.SONAR_ORG }}
-            -Dsonar.projectKey=stock-intelligence-platform
+      - name: Run Python coverage (technical-analysis-server)
+        working-directory: mcp-servers/technical-analysis-server
+        run: |
+          pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx -q
+          pytest tests/ --cov=. --cov-report=xml:coverage.xml --cov-omit="tests/*" -q
+
+      - name: Install sonar-scanner
+        run: |
+          curl -sSLo sonar-scanner.zip \
+            https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+          unzip -q sonar-scanner.zip
+          echo "$(pwd)/sonar-scanner-5.0.1.3006-linux/bin" >> $GITHUB_PATH
+
+      - name: Run SonarQube scan
+        run: |
+          sonar-scanner \
+            -Dsonar.host.url=http://localhost:9000 \
+            -Dsonar.token=admin \
+            -Dsonar.projectKey=stock-intelligence-platform \
+            -Dsonar.projectName="Stock Intelligence Platform"

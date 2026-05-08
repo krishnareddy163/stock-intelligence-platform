@@ -1,4 +1,4 @@
-.PHONY: help build run stop clean logs test setup dev prod
+.PHONY: help build run stop clean logs test setup dev prod sonar sonar-up
 
 help:
 	@echo "Stock Market Intelligence Platform - Available Commands"
@@ -69,3 +69,30 @@ health:
 	@echo ""
 	@curl -s http://localhost:8080/health | jq .
 	@curl -s http://localhost:5001/health | jq .
+
+sonar-up:
+	@echo "Starting SonarQube..."
+	docker-compose up -d sonarqube sonar-postgres
+	@echo "Waiting for SonarQube to be ready (up to 2 min)..."
+	@until curl -sf http://localhost:9000/api/system/status | grep -q '"status":"UP"'; do sleep 5; done
+	@echo "SonarQube is up -> http://localhost:9000 (admin / admin)"
+
+sonar: sonar-up
+	@echo "Building Java services..."
+	@for svc in user-service portfolio-service recommendation-service api-gateway; do \
+	  echo "  -> backend/$$svc"; \
+	  cd backend/$$svc && mvn -B verify --no-transfer-progress -q && cd ../..; \
+	done
+	@echo "Running Python coverage..."
+	@cd ai-orchestrator && pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx -q && \
+	  pytest tests/ --cov=. --cov-report=xml:coverage.xml --cov-omit="tests/*" -q; cd ..
+	@cd mcp-servers/stock-data-server && pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx -q && \
+	  pytest tests/ --cov=. --cov-report=xml:coverage.xml --cov-omit="tests/*" -q; cd ../..
+	@cd mcp-servers/technical-analysis-server && pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx -q && \
+	  pytest tests/ --cov=. --cov-report=xml:coverage.xml --cov-omit="tests/*" -q; cd ../..
+	@echo "Running sonar-scanner..."
+	sonar-scanner \
+	  -Dsonar.host.url=http://localhost:9000 \
+	  -Dsonar.token=admin \
+	  -Dsonar.projectKey=stock-intelligence-platform
+	@echo "Results -> http://localhost:9000/dashboard?id=stock-intelligence-platform"
