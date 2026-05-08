@@ -43,11 +43,11 @@ public class Recommendation {
     private String reason;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "technical_indicators", columnDefinition = "jsonb")
+    @Column(name = "technical_indicators", columnDefinition = "TEXT")
     private String technicalIndicators;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "sentiment_data", columnDefinition = "jsonb")
+    @Column(name = "sentiment_data", columnDefinition = "TEXT")
     private String sentimentData;
 
     @Column(name = "time_horizon")

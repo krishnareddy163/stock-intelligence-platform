@@ -75,7 +75,7 @@ jobs:
         run: |
           pytest tests/ -v \
             --cov=. --cov-report=xml:coverage.xml \
-            --cov-report=term-missing --cov-omit="tests/*"
+            --cov-report=term-missing --cov-omit='tests/*'
 
       - uses: actions/upload-artifact@v4
         with:
@@ -114,7 +114,7 @@ jobs:
         run: |
           pytest tests/ -v \
             --cov=. --cov-report=xml:coverage.xml \
-            --cov-report=term-missing --cov-omit="tests/*"
+            --cov-report=term-missing --cov-omit='tests/*'
 
       - uses: actions/upload-artifact@v4
         with:
@@ -375,19 +375,19 @@ jobs:
         working-directory: ai-orchestrator
         run: |
           pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx -q
-          pytest tests/ --cov=. --cov-report=xml:coverage.xml --cov-omit="tests/*" -q
+          pytest tests/ --cov=. --cov-report=xml:coverage.xml --cov-omit='tests/*' -q
 
       - name: Run Python coverage (stock-data-server)
         working-directory: mcp-servers/stock-data-server
         run: |
           pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx -q
-          pytest tests/ --cov=. --cov-report=xml:coverage.xml --cov-omit="tests/*" -q
+          pytest tests/ --cov=. --cov-report=xml:coverage.xml --cov-omit='tests/*' -q
 
       - name: Run Python coverage (technical-analysis-server)
         working-directory: mcp-servers/technical-analysis-server
         run: |
           pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx -q
-          pytest tests/ --cov=. --cov-report=xml:coverage.xml --cov-omit="tests/*" -q
+          pytest tests/ --cov=. --cov-report=xml:coverage.xml --cov-omit='tests/*' -q
 
       - name: Install sonar-scanner
         run: |

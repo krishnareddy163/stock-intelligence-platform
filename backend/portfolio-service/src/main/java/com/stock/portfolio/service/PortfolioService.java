@@ -11,6 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -93,7 +96,7 @@ public class PortfolioService {
     @Transactional
     public Portfolio rebalancePortfolio(String portfolioId) {
         Portfolio portfolio = portfolioRepository.findById(UUID.fromString(portfolioId))
-                .orElseThrow(() -> new IllegalArgumentException("Portfolio not found: " + portfolioId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Portfolio not found: " + portfolioId));
 
         portfolio.setLastRebalancedAt(LocalDateTime.now());
         return portfolioRepository.save(portfolio);

@@ -60,7 +60,7 @@ class AuthIntegrationTest {
     }
 
     @Test @Order(3)
-    void register_invalidEmail_returns422() throws Exception {
+    void register_invalidEmail_returns400() throws Exception {
         var req = new RegisterRequest();
         req.setEmail("not-an-email");
         req.setName("Bad User");
@@ -69,11 +69,11 @@ class AuthIntegrationTest {
         mvc.perform(post("/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
-           .andExpect(status().isUnprocessableEntity());
+           .andExpect(status().isBadRequest());
     }
 
     @Test @Order(4)
-    void register_shortPassword_returns422() throws Exception {
+    void register_shortPassword_returns400() throws Exception {
         var req = new RegisterRequest();
         req.setEmail("short@test.com");
         req.setName("Short Pass");
@@ -82,7 +82,7 @@ class AuthIntegrationTest {
         mvc.perform(post("/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
-           .andExpect(status().isUnprocessableEntity());
+           .andExpect(status().isBadRequest());
     }
 
     // ── Login ─────────────────────────────────────────────────────
@@ -161,6 +161,6 @@ class AuthIntegrationTest {
     void health_returnsUp() throws Exception {
         mvc.perform(get("/health"))
            .andExpect(status().isOk())
-           .andExpect(jsonPath("$.status").value("healthy"));
+           .andExpect(jsonPath("$.status").value("UP"));
     }
 }

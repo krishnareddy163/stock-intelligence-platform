@@ -7,8 +7,8 @@ import pytest
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, "../../mcp-servers/technical-analysis-server")
 sys.path.insert(0, "../../ai-orchestrator")
+sys.path.insert(0, "../../mcp-servers/technical-analysis-server")
 
 
 def _make_prices(n: int = 500, seed: int = 42) -> pd.Series:
