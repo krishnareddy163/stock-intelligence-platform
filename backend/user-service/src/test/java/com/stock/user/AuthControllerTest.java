@@ -105,6 +105,7 @@ public class AuthControllerTest {
         // Arrange
         LoginResponse loginResponse = LoginResponse.builder()
                 .token("testToken")
+                .tokenType("Bearer")
                 .expiresIn(3600L)
                 .user(userResponse)
                 .build();
