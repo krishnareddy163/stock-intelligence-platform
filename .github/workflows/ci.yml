@@ -398,9 +398,13 @@ jobs:
 
       - name: Run SonarQube scan
         run: |
+          SONAR_TOKEN=$(curl -sf -u admin:admin \
+            -X POST "http://localhost:9000/api/user_tokens/generate" \
+            -d "name=ci-token" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
           sonar-scanner \
             -Dsonar.host.url=http://localhost:9000 \
-            -Dsonar.token=admin \
+            -Dsonar.token="$SONAR_TOKEN" \
             -Dsonar.projectKey=stock-intelligence-platform \
             -Dsonar.projectName="Stock Intelligence Platform"
 
