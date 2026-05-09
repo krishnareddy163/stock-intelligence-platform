@@ -47,31 +47,37 @@ test.describe("Dashboard — Screener-style UI", () => {
   });
 
   test("renders index ticker bar with NIFTY 50", async ({ page }) => {
-    await expect(page.getByText("NIFTY 50")).toBeVisible();
+    // Use first() to avoid strict-mode error when parent containers also contain the text
+    await expect(page.getByText("NIFTY 50").first()).toBeVisible();
   });
 
   test("renders left sidebar market selector", async ({ page }) => {
-    await expect(page.getByText("Nifty 50")).toBeVisible();
+    // Scope to aside to avoid matching the breadcrumb which also shows the active market label
+    await expect(page.locator("aside").getByRole("button", { name: /Nifty 50/ })).toBeVisible();
   });
 
   test("renders Analyze button", async ({ page }) => {
-    await expect(page.getByRole("button", { name: /analyze/i })).toBeVisible();
+    // The run button is labelled "Run Screen", not "Analyze"
+    await expect(page.getByRole("button", { name: /run screen/i })).toBeVisible();
   });
 
   test("renders currency as ₹ for Indian markets", async ({ page }) => {
-    await expect(page.getByText(/₹/)).toBeVisible();
+    await expect(page.getByText(/₹/).first()).toBeVisible();
   });
 
   // ── Sidebar interactions ────────────────────────────────────────
 
   test("clicking SENSEX changes active market", async ({ page }) => {
-    await page.getByText("Sensex").click();
-    await expect(page.getByText("Sensex")).toHaveClass(/bg-\[#166534\]|bg-green/);
+    // Use role locator to avoid matching the breadcrumb span that also shows "Sensex" after click
+    await page.getByRole("button", { name: /Sensex/ }).click();
+    // Active state applies bg-[#f0fdf4] (light green) to the selected sidebar button
+    await expect(page.getByRole("button", { name: /Sensex/ })).toHaveClass(/bg-\[#f0fdf4\]/);
   });
 
   test("clicking risk profile changes selection", async ({ page }) => {
-    await page.getByText("Conservative").click();
-    await expect(page.getByText("Conservative")).toBeVisible();
+    // Use role locator to avoid strict-mode violation with breadcrumb "GROWTH · Conservative"
+    await page.getByRole("button", { name: "Conservative" }).click();
+    await expect(page.getByRole("button", { name: "Conservative" })).toBeVisible();
   });
 
   test("clicking time horizon changes selection", async ({ page }) => {
@@ -82,7 +88,7 @@ test.describe("Dashboard — Screener-style UI", () => {
   // ── Analysis flow ───────────────────────────────────────────────
 
   test("clicking Analyze calls the API and shows signals table", async ({ page }) => {
-    await page.getByRole("button", { name: /analyze/i }).click();
+    await page.getByRole("button", { name: /run screen/i }).click();
 
     await expect(page.getByText("RELIANCE")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("TCS")).toBeVisible();
@@ -90,7 +96,7 @@ test.describe("Dashboard — Screener-style UI", () => {
   });
 
   test("signals table shows BUY badge for RELIANCE", async ({ page }) => {
-    await page.getByRole("button", { name: /analyze/i }).click();
+    await page.getByRole("button", { name: /run screen/i }).click();
     await page.getByText("RELIANCE").waitFor({ timeout: 10_000 });
 
     const relianceRow = page.locator("tr", { has: page.getByText("RELIANCE") });
@@ -98,7 +104,7 @@ test.describe("Dashboard — Screener-style UI", () => {
   });
 
   test("switches to AI Report tab after analysis", async ({ page }) => {
-    await page.getByRole("button", { name: /analyze/i }).click();
+    await page.getByRole("button", { name: /run screen/i }).click();
     await page.getByText("RELIANCE").waitFor({ timeout: 10_000 });
 
     await page.getByRole("tab", { name: /ai report/i }).click();
@@ -130,6 +136,7 @@ test.describe("Dashboard — Screener-style UI", () => {
 
   test("sidebar is visible on desktop viewport", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
-    await expect(page.getByText("Market")).toBeVisible();
+    // Check the aside element itself rather than text that may match multiple elements
+    await expect(page.locator("aside").first()).toBeVisible();
   });
 });

@@ -24,33 +24,33 @@ def mcp_client(settings):
 
 
 @pytest.mark.asyncio
-@respx.mock
 async def test_call_tool_routes_stock_price(mcp_client):
-    respx.post("http://stock-data:5001/tools/get_stock_price").mock(
-        return_value=httpx.Response(200, json={"symbol": "RELIANCE", "price": 2850.0})
-    )
-    result = await mcp_client.call_tool("get_stock_price", {"symbol": "RELIANCE"})
+    with respx.mock:
+        respx.post("http://stock-data:5001/tools/get_stock_price").mock(
+            return_value=httpx.Response(200, json={"symbol": "RELIANCE", "price": 2850.0})
+        )
+        result = await mcp_client.call_tool("get_stock_price", {"symbol": "RELIANCE"})
     assert result["symbol"] == "RELIANCE"
     assert result["price"] == 2850.0
 
 
 @pytest.mark.asyncio
-@respx.mock
 async def test_call_tool_routes_technical_indicators(mcp_client):
-    respx.post("http://technical:5005/tools/get_technical_indicators").mock(
-        return_value=httpx.Response(200, json={"symbol": "TCS", "rsi": 55.2})
-    )
-    result = await mcp_client.call_tool("get_technical_indicators", {"symbol": "TCS"})
+    with respx.mock:
+        respx.post("http://technical:5005/tools/get_technical_indicators").mock(
+            return_value=httpx.Response(200, json={"symbol": "TCS", "rsi": 55.2})
+        )
+        result = await mcp_client.call_tool("get_technical_indicators", {"symbol": "TCS"})
     assert result["rsi"] == 55.2
 
 
 @pytest.mark.asyncio
-@respx.mock
 async def test_call_tool_routes_sentiment(mcp_client):
-    respx.post("http://sentiment:5002/tools/get_news_sentiment").mock(
-        return_value=httpx.Response(200, json={"symbol": "INFY", "sentiment": "POSITIVE"})
-    )
-    result = await mcp_client.call_tool("get_news_sentiment", {"symbol": "INFY"})
+    with respx.mock:
+        respx.post("http://sentiment:5002/tools/get_news_sentiment").mock(
+            return_value=httpx.Response(200, json={"symbol": "INFY", "sentiment": "POSITIVE"})
+        )
+        result = await mcp_client.call_tool("get_news_sentiment", {"symbol": "INFY"})
     assert result["sentiment"] == "POSITIVE"
 
 
@@ -62,100 +62,100 @@ async def test_call_tool_unknown_tool(mcp_client):
 
 
 @pytest.mark.asyncio
-@respx.mock
 async def test_call_tool_timeout_returns_error(mcp_client):
-    respx.post("http://stock-data:5001/tools/get_stock_price").mock(
-        side_effect=httpx.TimeoutException("timed out")
-    )
-    result = await mcp_client.call_tool("get_stock_price", {"symbol": "TCS"})
+    with respx.mock:
+        respx.post("http://stock-data:5001/tools/get_stock_price").mock(
+            side_effect=httpx.TimeoutException("timed out")
+        )
+        result = await mcp_client.call_tool("get_stock_price", {"symbol": "TCS"})
     assert result["error"] == "timeout"
     assert result["tool"] == "get_stock_price"
 
 
 @pytest.mark.asyncio
-@respx.mock
 async def test_call_tool_http_500_returns_error(mcp_client):
-    respx.post("http://stock-data:5001/tools/get_stock_price").mock(
-        return_value=httpx.Response(500, json={"detail": "Internal error"})
-    )
-    result = await mcp_client.call_tool("get_stock_price", {"symbol": "HDFC"})
+    with respx.mock:
+        respx.post("http://stock-data:5001/tools/get_stock_price").mock(
+            return_value=httpx.Response(500, json={"detail": "Internal error"})
+        )
+        result = await mcp_client.call_tool("get_stock_price", {"symbol": "HDFC"})
     assert "HTTP 500" in result["error"]
 
 
 @pytest.mark.asyncio
-@respx.mock
 async def test_call_tool_http_404_returns_error(mcp_client):
-    respx.post("http://stock-data:5001/tools/get_stock_price").mock(
-        return_value=httpx.Response(404, json={"detail": "Not found"})
-    )
-    result = await mcp_client.call_tool("get_stock_price", {"symbol": "UNKNOWN"})
+    with respx.mock:
+        respx.post("http://stock-data:5001/tools/get_stock_price").mock(
+            return_value=httpx.Response(404, json={"detail": "Not found"})
+        )
+        result = await mcp_client.call_tool("get_stock_price", {"symbol": "UNKNOWN"})
     assert "HTTP 404" in result["error"]
 
 
 @pytest.mark.asyncio
-@respx.mock
 async def test_call_tool_connection_error_returns_error(mcp_client):
-    respx.post("http://stock-data:5001/tools/get_stock_price").mock(
-        side_effect=httpx.ConnectError("connection refused")
-    )
-    result = await mcp_client.call_tool("get_stock_price", {"symbol": "WIPRO"})
+    with respx.mock:
+        respx.post("http://stock-data:5001/tools/get_stock_price").mock(
+            side_effect=httpx.ConnectError("connection refused")
+        )
+        result = await mcp_client.call_tool("get_stock_price", {"symbol": "WIPRO"})
     assert "error" in result
 
 
 @pytest.mark.asyncio
-@respx.mock
 async def test_health_check_all_healthy(mcp_client):
-    for url in [
-        "http://stock-data:5001/health",
-        "http://sentiment:5002/health",
-        "http://prediction:5003/health",
-        "http://portfolio:5004/health",
-        "http://technical:5005/health",
-        "http://alert:5006/health",
-    ]:
-        respx.get(url).mock(return_value=httpx.Response(200, json={"status": "healthy"}))
+    with respx.mock:
+        for url in [
+            "http://stock-data:5001/health",
+            "http://sentiment:5002/health",
+            "http://prediction:5003/health",
+            "http://portfolio:5004/health",
+            "http://technical:5005/health",
+            "http://alert:5006/health",
+        ]:
+            respx.get(url).mock(return_value=httpx.Response(200, json={"status": "healthy"}))
 
-    result = await mcp_client.health_check_all()
+        result = await mcp_client.health_check_all()
     assert all(v == "healthy" for v in result.values())
     assert "stock_data" in result
     assert "technical_analysis" in result
 
 
 @pytest.mark.asyncio
-@respx.mock
 async def test_health_check_partial_unreachable(mcp_client):
-    respx.get("http://stock-data:5001/health").mock(
-        return_value=httpx.Response(200, json={"status": "healthy"})
-    )
-    for url in [
-        "http://sentiment:5002/health",
-        "http://prediction:5003/health",
-        "http://portfolio:5004/health",
-        "http://technical:5005/health",
-        "http://alert:5006/health",
-    ]:
-        respx.get(url).mock(side_effect=httpx.ConnectError("refused"))
+    with respx.mock:
+        respx.get("http://stock-data:5001/health").mock(
+            return_value=httpx.Response(200, json={"status": "healthy"})
+        )
+        for url in [
+            "http://sentiment:5002/health",
+            "http://prediction:5003/health",
+            "http://portfolio:5004/health",
+            "http://technical:5005/health",
+            "http://alert:5006/health",
+        ]:
+            respx.get(url).mock(side_effect=httpx.ConnectError("refused"))
 
-    result = await mcp_client.health_check_all()
+        result = await mcp_client.health_check_all()
     assert result["stock_data"] == "healthy"
     assert result["sentiment"] == "unreachable"
 
 
 @pytest.mark.asyncio
-@respx.mock
 async def test_call_tool_build_portfolio_routes_portfolio(mcp_client):
-    respx.post("http://portfolio:5004/tools/build_portfolio").mock(
-        return_value=httpx.Response(200, json={"portfolio": [], "total": 0})
-    )
-    result = await mcp_client.call_tool("build_portfolio", {"symbols": ["RELIANCE", "TCS"]})
+    with respx.mock:
+        respx.post("http://portfolio:5004/tools/build_portfolio").mock(
+            return_value=httpx.Response(200, json={"portfolio": [], "total": 0})
+        )
+        result = await mcp_client.call_tool("build_portfolio", {"symbols": ["RELIANCE", "TCS"]})
     assert "portfolio" in result
 
 
 @pytest.mark.asyncio
-@respx.mock
 async def test_call_tool_predict_stock_price_routes_prediction(mcp_client):
-    respx.post("http://prediction:5003/tools/predict_stock_price").mock(
-        return_value=httpx.Response(200, json={"symbol": "NIFTY50", "prediction": 23000.0})
-    )
-    result = await mcp_client.call_tool("predict_stock_price", {"symbol": "NIFTY50"})
+    with respx.mock:
+        respx.post("http://prediction:5003/tools/predict_stock_price").mock(
+            return_value=httpx.Response(200, json={"symbol": "NIFTY50", "prediction": 23000.0})
+        )
+        result = await mcp_client.call_tool("predict_stock_price", {"symbol": "NIFTY50"})
     assert result["prediction"] == 23000.0
