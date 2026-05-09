@@ -52,8 +52,8 @@ test.describe("Dashboard — Screener-style UI", () => {
   });
 
   test("renders left sidebar market selector", async ({ page }) => {
-    // exact:true prevents /Nifty 50/ from also matching the "Nifty 500" button
-    await expect(page.locator("aside").getByRole("button", { name: "Nifty 50", exact: true })).toBeVisible();
+    // end-anchor prevents /Nifty 50/ from also matching the "Nifty 500" button
+    await expect(page.locator("aside").getByRole("button", { name: /Nifty 50$/ })).toBeVisible();
   });
 
   test("renders Analyze button", async ({ page }) => {
