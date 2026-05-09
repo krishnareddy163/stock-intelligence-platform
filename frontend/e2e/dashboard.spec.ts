@@ -52,8 +52,8 @@ test.describe("Dashboard — Screener-style UI", () => {
   });
 
   test("renders left sidebar market selector", async ({ page }) => {
-    // Scope to aside to avoid matching the breadcrumb which also shows the active market label
-    await expect(page.locator("aside").getByRole("button", { name: /Nifty 50/ })).toBeVisible();
+    // exact:true prevents /Nifty 50/ from also matching the "Nifty 500" button
+    await expect(page.locator("aside").getByRole("button", { name: "Nifty 50", exact: true })).toBeVisible();
   });
 
   test("renders Analyze button", async ({ page }) => {
@@ -107,7 +107,7 @@ test.describe("Dashboard — Screener-style UI", () => {
     await page.getByRole("button", { name: /run screen/i }).click();
     await page.getByText("RELIANCE").waitFor({ timeout: 10_000 });
 
-    await page.getByRole("tab", { name: /ai report/i }).click();
+    await page.getByRole("button", { name: /ai report/i }).click();
     await expect(page.getByText(/top picks/i)).toBeVisible();
   });
 
