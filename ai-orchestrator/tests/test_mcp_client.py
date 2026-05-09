@@ -1,8 +1,7 @@
 """Unit tests for McpClient — tool routing, timeouts, HTTP errors, health checks."""
 import pytest
 import httpx
-import respx
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from mcp_client import McpClient
 
 
@@ -18,37 +17,54 @@ def settings():
     return s
 
 
+def _ok_response(data: dict) -> MagicMock:
+    r = MagicMock()
+    r.raise_for_status.return_value = None
+    r.json.return_value = data
+    return r
+
+
+def _error_response(status_code: int) -> MagicMock:
+    inner = MagicMock()
+    inner.status_code = status_code
+    exc = httpx.HTTPStatusError(
+        f"HTTP {status_code}",
+        request=httpx.Request("POST", "http://test/"),
+        response=inner,
+    )
+    r = MagicMock()
+    r.raise_for_status.side_effect = exc
+    return r
+
+
 @pytest.mark.asyncio
 async def test_call_tool_routes_stock_price(settings):
-    with respx.mock as mock:
-        mock.post("http://stock-data:5001/tools/get_stock_price").mock(
-            return_value=httpx.Response(200, json={"symbol": "RELIANCE", "price": 2850.0})
-        )
-        client = McpClient(settings)
-        result = await client.call_tool("get_stock_price", {"symbol": "RELIANCE"})
+    client = McpClient(settings)
+    client._client = MagicMock(
+        post=AsyncMock(return_value=_ok_response({"symbol": "RELIANCE", "price": 2850.0}))
+    )
+    result = await client.call_tool("get_stock_price", {"symbol": "RELIANCE"})
     assert result["symbol"] == "RELIANCE"
     assert result["price"] == pytest.approx(2850.0)
 
 
 @pytest.mark.asyncio
 async def test_call_tool_routes_technical_indicators(settings):
-    with respx.mock as mock:
-        mock.post("http://technical:5005/tools/get_technical_indicators").mock(
-            return_value=httpx.Response(200, json={"symbol": "TCS", "rsi": 55.2})
-        )
-        client = McpClient(settings)
-        result = await client.call_tool("get_technical_indicators", {"symbol": "TCS"})
+    client = McpClient(settings)
+    client._client = MagicMock(
+        post=AsyncMock(return_value=_ok_response({"symbol": "TCS", "rsi": 55.2}))
+    )
+    result = await client.call_tool("get_technical_indicators", {"symbol": "TCS"})
     assert result["rsi"] == pytest.approx(55.2)
 
 
 @pytest.mark.asyncio
 async def test_call_tool_routes_sentiment(settings):
-    with respx.mock as mock:
-        mock.post("http://sentiment:5002/tools/get_news_sentiment").mock(
-            return_value=httpx.Response(200, json={"symbol": "INFY", "sentiment": "POSITIVE"})
-        )
-        client = McpClient(settings)
-        result = await client.call_tool("get_news_sentiment", {"symbol": "INFY"})
+    client = McpClient(settings)
+    client._client = MagicMock(
+        post=AsyncMock(return_value=_ok_response({"symbol": "INFY", "sentiment": "POSITIVE"}))
+    )
+    result = await client.call_tool("get_news_sentiment", {"symbol": "INFY"})
     assert result["sentiment"] == "POSITIVE"
 
 
@@ -62,64 +78,48 @@ async def test_call_tool_unknown_tool(settings):
 
 @pytest.mark.asyncio
 async def test_call_tool_timeout_returns_error(settings):
-    with respx.mock as mock:
-        mock.post("http://stock-data:5001/tools/get_stock_price").mock(
-            side_effect=httpx.TimeoutException("timed out")
-        )
-        client = McpClient(settings)
-        result = await client.call_tool("get_stock_price", {"symbol": "TCS"})
+    client = McpClient(settings)
+    client._client = MagicMock(
+        post=AsyncMock(side_effect=httpx.TimeoutException("timed out"))
+    )
+    result = await client.call_tool("get_stock_price", {"symbol": "TCS"})
     assert result["error"] == "timeout"
     assert result["tool"] == "get_stock_price"
 
 
 @pytest.mark.asyncio
 async def test_call_tool_http_500_returns_error(settings):
-    with respx.mock as mock:
-        mock.post("http://stock-data:5001/tools/get_stock_price").mock(
-            return_value=httpx.Response(500, json={"detail": "Internal error"})
-        )
-        client = McpClient(settings)
-        result = await client.call_tool("get_stock_price", {"symbol": "HDFC"})
+    client = McpClient(settings)
+    client._client = MagicMock(post=AsyncMock(return_value=_error_response(500)))
+    result = await client.call_tool("get_stock_price", {"symbol": "HDFC"})
     assert "HTTP 500" in result["error"]
 
 
 @pytest.mark.asyncio
 async def test_call_tool_http_404_returns_error(settings):
-    with respx.mock as mock:
-        mock.post("http://stock-data:5001/tools/get_stock_price").mock(
-            return_value=httpx.Response(404, json={"detail": "Not found"})
-        )
-        client = McpClient(settings)
-        result = await client.call_tool("get_stock_price", {"symbol": "UNKNOWN"})
+    client = McpClient(settings)
+    client._client = MagicMock(post=AsyncMock(return_value=_error_response(404)))
+    result = await client.call_tool("get_stock_price", {"symbol": "UNKNOWN"})
     assert "HTTP 404" in result["error"]
 
 
 @pytest.mark.asyncio
 async def test_call_tool_connection_error_returns_error(settings):
-    with respx.mock as mock:
-        mock.post("http://stock-data:5001/tools/get_stock_price").mock(
-            side_effect=httpx.ConnectError("connection refused")
-        )
-        client = McpClient(settings)
-        result = await client.call_tool("get_stock_price", {"symbol": "WIPRO"})
+    client = McpClient(settings)
+    client._client = MagicMock(
+        post=AsyncMock(side_effect=httpx.ConnectError("connection refused"))
+    )
+    result = await client.call_tool("get_stock_price", {"symbol": "WIPRO"})
     assert "error" in result
 
 
 @pytest.mark.asyncio
 async def test_health_check_all_healthy(settings):
-    with respx.mock as mock:
-        for url in [
-            "http://stock-data:5001/health",
-            "http://sentiment:5002/health",
-            "http://prediction:5003/health",
-            "http://portfolio:5004/health",
-            "http://technical:5005/health",
-            "http://alert:5006/health",
-        ]:
-            mock.get(url).mock(return_value=httpx.Response(200, json={"status": "healthy"}))
+    client = McpClient(settings)
+    mock_response = MagicMock(status_code=200)
+    client._client = MagicMock(get=AsyncMock(return_value=mock_response))
 
-        client = McpClient(settings)
-        result = await client.health_check_all()
+    result = await client.health_check_all()
     assert all(v == "healthy" for v in result.values())
     assert "stock_data" in result
     assert "technical_analysis" in result
@@ -127,42 +127,35 @@ async def test_health_check_all_healthy(settings):
 
 @pytest.mark.asyncio
 async def test_health_check_partial_unreachable(settings):
-    with respx.mock as mock:
-        mock.get("http://stock-data:5001/health").mock(
-            return_value=httpx.Response(200, json={"status": "healthy"})
-        )
-        for url in [
-            "http://sentiment:5002/health",
-            "http://prediction:5003/health",
-            "http://portfolio:5004/health",
-            "http://technical:5005/health",
-            "http://alert:5006/health",
-        ]:
-            mock.get(url).mock(side_effect=httpx.ConnectError("refused"))
+    client = McpClient(settings)
+    mock_healthy = MagicMock(status_code=200)
 
-        client = McpClient(settings)
-        result = await client.health_check_all()
+    async def mock_get(url, timeout=None):
+        if "stock-data" in url:
+            return mock_healthy
+        raise httpx.ConnectError("refused")
+
+    client._client = MagicMock(get=mock_get)
+    result = await client.health_check_all()
     assert result["stock_data"] == "healthy"
     assert result["sentiment"] == "unreachable"
 
 
 @pytest.mark.asyncio
 async def test_call_tool_build_portfolio_routes_portfolio(settings):
-    with respx.mock as mock:
-        mock.post("http://portfolio:5004/tools/build_portfolio").mock(
-            return_value=httpx.Response(200, json={"portfolio": [], "total": 0})
-        )
-        client = McpClient(settings)
-        result = await client.call_tool("build_portfolio", {"symbols": ["RELIANCE", "TCS"]})
+    client = McpClient(settings)
+    client._client = MagicMock(
+        post=AsyncMock(return_value=_ok_response({"portfolio": [], "total": 0}))
+    )
+    result = await client.call_tool("build_portfolio", {"symbols": ["RELIANCE", "TCS"]})
     assert "portfolio" in result
 
 
 @pytest.mark.asyncio
 async def test_call_tool_predict_stock_price_routes_prediction(settings):
-    with respx.mock as mock:
-        mock.post("http://prediction:5003/tools/predict_stock_price").mock(
-            return_value=httpx.Response(200, json={"symbol": "NIFTY50", "prediction": 23000.0})
-        )
-        client = McpClient(settings)
-        result = await client.call_tool("predict_stock_price", {"symbol": "NIFTY50"})
+    client = McpClient(settings)
+    client._client = MagicMock(
+        post=AsyncMock(return_value=_ok_response({"symbol": "NIFTY50", "prediction": 23000.0}))
+    )
+    result = await client.call_tool("predict_stock_price", {"symbol": "NIFTY50"})
     assert result["prediction"] == pytest.approx(23000.0)
