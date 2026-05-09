@@ -52,7 +52,7 @@ class RecommendationServiceTest {
         request.setPreferredSectors(List.of());
         request.setQuery("Best Nifty 50 stocks");
 
-        when(redisTemplate.opsForValue()).thenReturn(valueOps);
+        lenient().when(redisTemplate.opsForValue()).thenReturn(valueOps);
     }
 
     @Test

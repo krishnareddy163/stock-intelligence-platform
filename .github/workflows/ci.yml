@@ -68,7 +68,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ai-orchestrator
-        run: pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx -q
+        run: pip install -r requirements.txt pytest==8.3.2 pytest-asyncio==0.23.8 pytest-cov==5.0.0 respx==0.21.1 -q
 
       - name: Run tests
         working-directory: ai-orchestrator
@@ -107,7 +107,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: mcp-servers/${{ matrix.server }}
-        run: pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx -q
+        run: pip install -r requirements.txt pytest==8.3.2 pytest-asyncio==0.23.8 pytest-cov==5.0.0 respx==0.21.1 -q
 
       - name: Run tests
         working-directory: mcp-servers/${{ matrix.server }}
@@ -374,19 +374,19 @@ jobs:
       - name: Run Python coverage (orchestrator)
         working-directory: ai-orchestrator
         run: |
-          pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx -q
+          pip install -r requirements.txt pytest==8.3.2 pytest-asyncio==0.23.8 pytest-cov==5.0.0 respx==0.21.1 -q
           pytest tests/ --cov=. --cov-report=xml:coverage.xml --cov-omit='tests/*' -q
 
       - name: Run Python coverage (stock-data-server)
         working-directory: mcp-servers/stock-data-server
         run: |
-          pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx -q
+          pip install -r requirements.txt pytest==8.3.2 pytest-asyncio==0.23.8 pytest-cov==5.0.0 respx==0.21.1 -q
           pytest tests/ --cov=. --cov-report=xml:coverage.xml --cov-omit='tests/*' -q
 
       - name: Run Python coverage (technical-analysis-server)
         working-directory: mcp-servers/technical-analysis-server
         run: |
-          pip install -r requirements.txt pytest pytest-asyncio pytest-cov respx -q
+          pip install -r requirements.txt pytest==8.3.2 pytest-asyncio==0.23.8 pytest-cov==5.0.0 respx==0.21.1 -q
           pytest tests/ --cov=. --cov-report=xml:coverage.xml --cov-omit='tests/*' -q
 
       - name: Install sonar-scanner

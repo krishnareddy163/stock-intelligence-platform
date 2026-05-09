@@ -98,7 +98,7 @@ class AuthIntegrationTest {
                 .content(objectMapper.writeValueAsString(req)))
            .andExpect(status().isOk())
            .andExpect(jsonPath("$.token").isNotEmpty())
-           .andExpect(jsonPath("$.email").value(EMAIL))
+           .andExpect(jsonPath("$.user.email").value(EMAIL))
            .andReturn();
 
         var body = objectMapper.readTree(result.getResponse().getContentAsString());
