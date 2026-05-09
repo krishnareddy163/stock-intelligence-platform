@@ -51,7 +51,7 @@ jobs:
             )
             for svc in "${!PATHS[@]}"; do
               if git diff --name-only HEAD~1 HEAD | grep -q "^${PATHS[$svc]}"; then
-                SERVICES=$(echo "$SERVICES" | jq --arg s "$svc" '. + [$s]')
+                SERVICES=$(echo "$SERVICES" | jq -c --arg s "$svc" '. + [$s]')
               fi
             done
             # Always include if empty (first push / force)
